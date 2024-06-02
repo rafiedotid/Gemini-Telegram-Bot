@@ -133,6 +133,41 @@ def escape(text, flag=0):
     text = re.sub(r"!", "\!", text)
     return text
 
+# ... (Imports, initial setup as before)
+
+async def handle_customer_query(bot, message):
+    query = message.text.strip()
+
+    # Knowledge Base Retrieval (Example using a simplified system)
+    relevant_info = retrieve_from_knowledge_base(query, "https://mirai-pedia.com/page/site/ketentuan-layanan")
+
+    if relevant_info:
+        prompt = f"Customer Question: {query}\nKnowledge Base Information: {relevant_info}"
+    else:
+        prompt = f"Customer Question: {query}\nNo relevant information found in the knowledge base."
+
+    try:
+        # Choose the appropriate model
+        if message.photo: 
+            model = genai.GenerativeModel("gemini-pro-vision")
+            contents = {"parts": [{"mime_type": "image/jpeg", "data": await download_image(message)}, {"text": prompt}]}
+        else:
+            model = genai.GenerativeModel("gemini-1.5-pro-latest")  # Assuming Gemini Pro for text-only
+            contents = prompt
+
+        # Generate a response from Gemini
+        response = await async_generate_content(model, contents)
+
+        # Send the response to the user, formatted if needed
+        await bot.reply_to(message, escape(response.text), parse_mode="MarkdownV2")
+
+    except Exception as e:
+        if "UnsupportedFeature" in str(e):  # Check for out-of-scope error
+            await bot.reply_to(message, "Maaf, pertanyaan Anda di luar cakupan layanan saya saat ini. Silakan hubungi customer support kami untuk bantuan lebih lanjut.")
+        else:
+            traceback.print_exc()
+            await bot.reply_to(message, "Terjadi kesalahan. Mohon coba lagi nanti.")
+
 # Prevent "create_convo" function from blocking the event loop.
 async def make_new_gemini_convo():
     loop = asyncio.get_running_loop()
